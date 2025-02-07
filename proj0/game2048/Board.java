@@ -84,6 +84,7 @@ public class Board implements Iterable<Tile> {
      * treated as coordinates with respect to the current viewPerspective.
      *
      * Returns whether or not this move is a merge.
+     * after moving, the original tile set to null
      * */
     public boolean move(int col, int row, Tile tile) {
         int pcol = viewPerspective.col(col, row, size()),

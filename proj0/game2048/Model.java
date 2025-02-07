@@ -106,6 +106,29 @@ public class Model extends Observable {
      *    value, then the leading two tiles in the direction of motion merge,
      *    and the trailing tile does not.
      * */
+    public boolean pushUp(Board b, int col) {
+        int size = b.size();
+        boolean changed = false;
+        for(int i = size-1; i>=0; i--) {
+            // find out the empty tile
+            if(b.tile(col, i) != null) {
+                continue;
+            }
+            Tile next = null;
+            for(int j=i-1; j>=0; j--) {
+                if(b.tile(col, j) != null) {
+                    next = b.tile(col, j);
+                    break;
+                }
+            }
+            if(next != null) {
+                b.move(col, i, next);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     public boolean tilt(Side side) {
         boolean changed;
         changed = false;
@@ -113,7 +136,32 @@ public class Model extends Observable {
         // TODO: Modify this.board (and perhaps this.score) to account
         // for the tilt to the Side SIDE. If the board changed, set the
         // changed local variable to true.
-
+        board.setViewingPerspective(side);
+        for(int col = 0; col <board.size(); col++) {
+            if(pushUp(board, col)) {
+                changed = true;
+            }
+        }
+        for(int col=0; col<board.size(); col++) {
+            for(int i=board.size()-2; i>=0; i--) {
+                Tile t1 = board.tile(col, i);
+                if(t1 == null) {
+                    break;
+                }
+                else{
+                    Tile t2 = board.tile(col, i+1);
+                    if(t2!=null && t2.value() == t1.value()) {
+                        score += 2*t1.value();
+                        board.move(col, i+1, t1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        for(int col=0; col< board.size(); col++) {
+            pushUp(board, col);
+        }
+        board.setViewingPerspective(Side.NORTH);
         checkGameOver();
         if (changed) {
             setChanged();
@@ -138,6 +186,14 @@ public class Model extends Observable {
      * */
     public static boolean emptySpaceExists(Board b) {
         // TODO: Fill in this function.
+        int size = b.size();
+        for(int col=0; col<size; col++){
+            for(int row=0; row<size; row++){
+                if(b.tile(col, row) == null){
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -148,9 +204,41 @@ public class Model extends Observable {
      */
     public static boolean maxTileExists(Board b) {
         // TODO: Fill in this function.
+        int size = b.size();
+        for(int col=0; col<size; col++){
+            for(int row=0; row<size; row++){
+                if(b.tile(col,row) == null){
+                    continue;
+                }
+                else if(b.tile(col,row).value() == MAX_PIECE){
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
+    public static boolean existSameTile(Board b, int col, int row) {
+        int size = b.size();
+        int value = b.tile(col, row).value();
+        int[][] new_pos = {
+                {col-1, row},
+                {col, row-1},
+                {col+1, row},
+                {col, row+1}
+        };
+
+        for(int i=0; i<4; i++) {
+            int new_col = new_pos[i][0];
+            int new_row = new_pos[i][1];
+            if(new_col>=0 && new_col<size && new_row>=0 && new_row<size) {
+                if(value == b.tile(new_col, new_row).value()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     /**
      * Returns true if there are any valid moves on the board.
      * There are two ways that there can be valid moves:
@@ -159,6 +247,18 @@ public class Model extends Observable {
      */
     public static boolean atLeastOneMoveExists(Board b) {
         // TODO: Fill in this function.
+        int size = b.size();
+        if(emptySpaceExists(b)) {
+            return true;
+        }
+        // check whether two adjacent tiles have the same value
+        for(int col=0; col<size; col++) {
+            for(int row=0; row<size; row++) {
+                if(existSameTile(b, col, row)) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
