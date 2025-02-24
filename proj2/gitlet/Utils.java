@@ -70,7 +70,7 @@ class Utils {
      *  and throws IllegalArgumentException unless the directory designated by
      *  FILE also contains a directory named .gitlet. */
     static boolean restrictedDelete(File file) {
-        if (!(new File(file.getParentFile(), ".gitlet")).isDirectory()) {
+        if (!(new File(file.getParentFile(), "gittest/gitlet2")).isDirectory()) {
             throw new IllegalArgumentException("not .gitlet working directory");
         }
         if (!file.isDirectory()) {
@@ -157,6 +157,15 @@ class Utils {
         writeContents(file, serialize(obj));
     }
 
+    /** Create empty file */
+    static void createEmptyFile(File file) {
+        try {
+            file.createNewFile();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
     /* DIRECTORIES */
 
     /** Filter out all but plain files. */
@@ -234,6 +243,13 @@ class Utils {
      *  method, followed by a newline. */
     static void message(String msg, Object... args) {
         System.out.printf(msg, args);
+        System.out.println();
+    }
+
+    static void printStatus(List<String> list) {
+        for(String i : list) {
+            message(i);
+        }
         System.out.println();
     }
 }

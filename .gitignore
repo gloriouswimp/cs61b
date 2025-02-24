@@ -3,3 +3,6 @@ out/
 *.iml
 library-sp21/
 target/
+*.class
+*.zip
+.gitlet/
