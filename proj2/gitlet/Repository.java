@@ -314,7 +314,7 @@ public class Repository {
     private static void printStatus(String heading, List<String> list, String append) {
         message(heading);
         for (String s : list) {
-            message(s + append);
+            message(s );
         }
         System.out.println();
     }
