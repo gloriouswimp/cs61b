@@ -311,10 +311,10 @@ public class Repository {
      * @param heading
      * @param list
      */
-    private static void printStatus(String heading, List<String> list) {
+    private static void printStatus(String heading, List<String> list, String append) {
         message(heading);
         for (String s : list) {
-            message(s);
+            message(s + append);
         }
         System.out.println();
     }
@@ -394,11 +394,12 @@ public class Repository {
             }
         }
         deletedFiles.sort(Comparator.naturalOrder());
-        printStatus("=== Staged Files ===", stageFiles);
-        printStatus("=== Removed Files ===", removeFiles);
-        printStatus("=== Modified ===", modifiedFiles);
-        printStatus("=== Deleted ===", deletedFiles);
-        printStatus("=== Untracked Files ===", untrackedFiles);
+        printStatus("=== Staged Files ===", stageFiles, null);
+        printStatus("=== Removed Files ===", removeFiles, null);
+        message("=== Modifications Not Staged For Commit ===");
+        System.out.println();
+        message("=== Untracked Files ===");
+        System.out.println();
     }
 
 

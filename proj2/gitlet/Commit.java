@@ -77,7 +77,11 @@ public class Commit implements Serializable {
      * This method forces user to use and save getCommitID()
      */
     public void saveCommit(String commitID) {
-        File savePath = join(COMMITS_DIR, commitID);
+        File saveDir = join(COMMITS_DIR, commitID.substring(0,2));
+        File savePath = join(saveDir, commitID);
+        if (!saveDir.exists()) {
+            saveDir.mkdir();
+        }
         writeObject(savePath, this);
     }
 
@@ -98,12 +102,24 @@ public class Commit implements Serializable {
         if(commitID == null){
             return null;
         }
-        File commitPath = join(COMMITS_DIR, commitID);
-        if(!commitPath.exists()) {
+        File commitDir = join(COMMITS_DIR, commitID.substring(0,2));
+        if(!commitDir.exists()) {
             message("No commit with that id exists.");
             exit(0);
         }
-        return readObject(commitPath, Commit.class);
+        else {
+            List<String> commitIDList = plainFilenamesIn(commitDir);
+            int len = commitID.length();
+            for (String id : commitIDList) {
+                if (id.substring(0, len).equals(commitID)) {
+                    File commitPath = join(commitDir, id);
+                    return readObject(commitPath, Commit.class);
+                }
+            }
+            message("No commit with that id exists.");
+            exit(0);
+        }
+        return null;
     }
 
     public void printLog(String id) {
