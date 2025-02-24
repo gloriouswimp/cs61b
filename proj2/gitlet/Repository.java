@@ -92,6 +92,9 @@ public class Repository {
         writeContents(headPath, commitID);
     }
 
+    private static List<String> getBranchList() {
+        return plainFilenamesIn(HEAD_DIR);
+    }
     /** get the current branch name
      * test: pass
      * @return
@@ -108,6 +111,15 @@ public class Repository {
         writeContents(BRANCH_FILE, branchName);
     }
 
+    public static String getBranchCommitID(String branchName) {
+        File path = join(HEAD_DIR, branchName);
+        return readContentsAsString(path);
+    }
+
+    public static void setCurrentBranchCommitID(String commitID) {
+        File path = join(HEAD_DIR, getCurrentBranchName());
+        writeContents(path, commitID);
+    }
     /** Get commit of given branch name
      * test:  pass
      * @param branchName
@@ -127,12 +139,42 @@ public class Repository {
         return getBranchCommit(getCurrentBranchName());
     }
 
+    /* METHODS ABOUT FILES STATUS */
+    private static List<String> getUntrackedList() {
+        List<String> list = new LinkedList<>();
+        List<String> filesInCWD = plainFilenamesIn(CWD);
+        Set<String> filesInCommit = getCurrentCommit().getBlobMap().keySet();
+
+        for (String filename : filesInCWD) {
+            if (!Stage.hasFile(filename, ADD_DIR)) {
+                if (Stage.hasFile(filename, REMOVE_DIR) || !filesInCommit.contains(filename)) {
+                    list.add(filename);
+                }
+            }
+        }
+        return list;
+    }
+
+    private static List<String> getTrackedList() {
+        List<String> list = new LinkedList<>();
+        List<String> filesInCWD = plainFilenamesIn(CWD);
+        Set<String> filesInCommit = getCurrentCommit().getBlobMap().keySet();
+
+        for (String filename : filesInCWD) {
+            if (Stage.hasFile(filename, ADD_DIR) || filesInCommit.contains(filename)) {
+                list.add(filename);
+            }
+        }
+        return list;
+    }
+
+    /* IMPLEMENTATION OF COMMAND */
+
     /** Implementation of the add command
      *
      * @param filename
      */
     public static void addStage(String filename) {
-        checkInit();
         File file = join(CWD, filename);
 
         /* file doesn't exist */
@@ -167,8 +209,6 @@ public class Repository {
      * @param filename
      */
     public static void removeStage(String filename) {
-        checkInit();
-
         /* Check whether the file is staged or in the commit */
         Commit c = getCurrentCommit();
         if(!c.hasFilename(filename) && !Stage.hasFile(filename, ADD_DIR)) {
@@ -266,8 +306,20 @@ public class Repository {
         }
     }
 
+    /** helper function for status
+     *
+     * @param heading
+     * @param list
+     */
+    private static void printStatus(String heading, List<String> list) {
+        message(heading);
+        for (String s : list) {
+            message(s);
+        }
+        System.out.println();
+    }
     /** Implementation of status command
-     *  TODO: not completed yet
+     *  TODO: not test yet
      */
     public static void status() {
         /* Print branches */
@@ -282,81 +334,164 @@ public class Repository {
         }
         System.out.println();
         /* Check file in working dir */
-        List<String> files = plainFilenamesIn(CWD);
-        List<String> addFiles = plainFilenamesIn(ADD_DIR);
-        List<String> removeFiles = plainFilenamesIn(REMOVE_DIR);
+        List<String> filesInCWD = plainFilenamesIn(CWD);
+        List<String> filesInADD = plainFilenamesIn(ADD_DIR);
+        List<String> filesInRemove = plainFilenamesIn(REMOVE_DIR);
         /* warning:
         In this case, we don't save the commit anymore, so it is valid not to
         create a new BlobTree. */
-        TreeMap<String, String> commitTree = getCurrentCommit().getBlobMap();
+        Commit currentCommit = getCurrentCommit();
+        TreeMap<String, String> commitTree = currentCommit.getBlobMap();
         Set<String> commitFiles = commitTree.keySet();
 
         List<String> stageFiles = new ArrayList<>();
-        List<String> rmFiles = new ArrayList<>();
+        List<String> removeFiles = new ArrayList<>();
         List<String> modifiedFiles = new ArrayList<>();
         List<String> deletedFiles = new ArrayList<>();
-        List<String> utFiles = new ArrayList<>();
+        List<String> untrackedFiles = new ArrayList<>();
         /* Check the file in CWD */
-        for(String f : files) {
-            String content = readContentsAsString(join(CWD, f));
-            if(addFiles.contains(f)) {
-                String addContent = Stage.getContentFromAdd(f);
-                if(addContent.equals(content)) {stageFiles.add(f);}
-                else {modifiedFiles.add(f);}
-                addFiles.remove(f);
-                commitFiles.remove(f);
-            } else if(removeFiles.contains(f)) {
-                utFiles.add(f);
-                removeFiles.remove(f);
-                commitFiles.remove(f);
-            } else if(commitTree.containsKey(f)) {
-                String blobID = commitTree.get(f);
-                String blobContent = Blob.readContentFromID(blobID);
-                if(!blobContent.equals(content)) {
-                    modifiedFiles.add(f);
+        for (String filename : filesInCWD) {
+            if (filesInADD.contains(filename)) {
+                File filePath = join(CWD, filename);
+                String content = Stage.getContentFromAdd(filename);
+                if (content.equals(readContentsAsString(filePath))) {
+                    stageFiles.add(filename);
                 }
-                commitFiles.remove(f);
-            }
-            files.remove(f);
-        }
-
-        for(String f : addFiles) {
-            modifiedFiles.add(f);
-            addFiles.remove(f);
-        }
-
-        for(String f : removeFiles) {
-            if(!files.contains(f)) {
-                rmFiles.add(f);
-            }
-            removeFiles.remove(f);
-        }
-
-        for(String f : commitFiles) {
-            if(files.contains(f)) {
-                String content = readContentsAsString(join(CWD, f));
-                String blobID = commitTree.get(f);
-                String blobContent = Blob.readContentFromID(blobID);
-                if(!blobContent.equals(content)) {
-                    utFiles.add(f);
+                else {
+                    modifiedFiles.add(filename);
                 }
-            }
-            else {
-                deletedFiles.add(f);
+            } else if (filesInRemove.contains(filename)) {
+                untrackedFiles.add(filename);
+            } else if (commitFiles.contains(filename)) {
+                String content = readContentsAsString(join(CWD, filename));
+                String commitContent = currentCommit.getContentFromName(filename);
+                if (!commitContent.equals(content)) {
+                    modifiedFiles.add(filename);
+                }
+            } else {
+                untrackedFiles.add(filename);
             }
         }
-        /* Print status */
-        message("=== Staged Files ===");
-        printStatus(stageFiles);
-        message("=== Removed Files ===");
-        printStatus(rmFiles);
-        message("=== Modifications Not Staged For Commit ===");
-        printStatus(modifiedFiles);
-        message("=== Untracked Files ===");
-        printStatus(utFiles);
+
+        for (String filename : filesInADD) {
+            if (!filesInCWD.contains(filename)) {
+                deletedFiles.add(filename);
+            }
+        }
+
+        for (String filename : filesInRemove) {
+            if (!filesInCWD.contains(filename)) {
+                removeFiles.add(filename);
+            }
+        }
+
+        for (String filename : commitFiles) {
+            if (filesInADD.contains(filename) || filesInRemove.contains(filename)) {
+                continue;
+            }
+            if (!filesInCWD.contains(filename)) {
+                deletedFiles.add(filename);
+            }
+        }
+        deletedFiles.sort(Comparator.naturalOrder());
+        printStatus("=== Staged Files ===", stageFiles);
+        printStatus("=== Removed Files ===", removeFiles);
+        printStatus("=== Modified ===", modifiedFiles);
+        printStatus("=== Deleted ===", deletedFiles);
+        printStatus("=== Untracked Files ===", untrackedFiles);
     }
 
-    public static void checkout() {
 
+    public static void checkoutBranch(String branchName) {
+        List<String> branchList = getBranchList();
+        List<String> untrackedList = getUntrackedList();
+        List<String> trackedList = getTrackedList();
+        if (!branchList.contains(branchName)) {
+            message("No such branch exists.");
+            exit(0);
+        }
+        if (getCurrentBranchName().equals(branchName)) {
+            message("No need to checkout the current branch.");
+            exit(0);
+        }
+        if (!untrackedList.isEmpty()) {
+            message("There is an untracked file in the way; delete it, or add and commit it first.");
+            exit(0);
+        }
+
+        for (String filename : trackedList) {
+            join(CWD, filename).delete();
+        }
+        Commit c = getBranchCommit(branchName);
+        TreeMap<String, String> map = c.getBlobMap();
+        for (String filename : map.keySet()) {
+            writeContents(join(CWD, filename), Blob.readContentFromID(map.get(filename)));
+        }
+        setCurrentBranch(branchName);
+        Stage.clearStage();
     }
+
+    public static void checkoutDefaultFile(String filename) {
+        Commit c = getCurrentCommit();
+        if (!c.hasFilename(filename)) {
+            message("File does not exist in that commit.");
+            exit(0);
+        }
+        String content = c.getContentFromName(filename);
+        writeContents(join(CWD, filename), content);
+    }
+
+    public static void checkoutDesignatedFile(String commitID, String filename) {
+        Commit c = Commit.getCommitFromID(commitID);
+        if (!c.hasFilename(filename)) {
+            message("File does not exist in that commit.");
+            exit(0);
+        }
+        String content = c.getContentFromName(filename);
+        writeContents(join(CWD, filename), content);
+    }
+
+    public static void branch(String branchName){
+        if (getBranchList().contains(branchName)) {
+            message("A branch with that name already exists.");
+            exit(0);
+        }
+        String currentCommitID = getBranchCommitID(getCurrentBranchName());
+        saveHead(branchName, currentCommitID);
+    }
+
+    public static void removeBranch(String branchName) {
+        List<String> branchList = getBranchList();
+        if (!branchList.contains(branchName)) {
+            message("A branch with that name does not exist.");
+            exit(0);
+        }
+        if (branchName.equals(getCurrentBranchName())) {
+            message("Cannot remove the current branch.");
+            exit(0);
+        }
+        File branchPath = join(HEAD_DIR, branchName);
+        branchPath.delete();
+    }
+
+    public static void reset(String commitID) {
+        List<String> untrackedList = getUntrackedList();
+        if (!untrackedList.isEmpty()) {
+            message("There is an untracked file in the way; delete it, or add and commit it first.");
+            exit(0);
+        }
+        TreeMap<String, String> map = Commit.getCommitFromID(commitID).getBlobMap();
+        Set<String> filesInCommit = map.keySet();
+
+        List<String> trackedList = getTrackedList();
+        for (String filename : trackedList) {
+            join(CWD, filename).delete();
+        }
+        for (String filename : filesInCommit) {
+            String content = Blob.readContentFromID(map.get(filename));
+            writeContents(join(CWD, filename), content);
+        }
+        setCurrentBranchCommitID(commitID);
+    }
+
 }

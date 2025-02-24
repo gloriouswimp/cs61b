@@ -4,9 +4,8 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 import static gitlet.Repository.*;
 import static gitlet.Utils.*;
-import java.util.Date;
-import java.util.Formatter;
-import java.util.Locale;
+
+import java.util.*;
 
 
 public class TestMain {
@@ -84,8 +83,30 @@ public class TestMain {
         message("123");
         message("234");
     }
+
     @Test
-    public void testStatus() {
-        Repository.status();
+    public void testFileRemove() {
+        List<String> files = plainFilenamesIn(CWD);
+        /* asList can't use remove function */
+        Iterator<String> it = files.iterator();
+
+        while(it.hasNext()) {
+            String s = it.next();
+            it.remove();
+            System.out.println(files);
+        }
+        if (files.isEmpty()) {
+            message("List is empty");
+        }
+    }
+
+    @Test
+    public void testLinkedList() {
+        List<String> files = plainFilenamesIn(CWD);
+        for (int i=0; i<files.size(); i++) {
+            System.out.println(files);
+            String filename = files.get(i);
+            files.remove(i);
+        }
     }
 }

@@ -100,7 +100,7 @@ public class Commit implements Serializable {
         }
         File commitPath = join(COMMITS_DIR, commitID);
         if(!commitPath.exists()) {
-            message("The Commit ID doesn't exist");
+            message("No commit with that id exists.");
             exit(0);
         }
         return readObject(commitPath, Commit.class);

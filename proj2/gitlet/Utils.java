@@ -246,10 +246,4 @@ class Utils {
         System.out.println();
     }
 
-    static void printStatus(List<String> list) {
-        for(String i : list) {
-            message(i);
-        }
-        System.out.println();
-    }
 }
