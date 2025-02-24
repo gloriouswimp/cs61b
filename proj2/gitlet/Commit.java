@@ -113,7 +113,7 @@ public class Commit implements Serializable {
             System.out.println("Merge " + getFirstParentID().substring(0, 7)
                     + " " + getSecondParentID().substring(0, 7));
         }
-        message("Date "+ getFormatDate());
+        message("Date: "+ getFormatDate());
         message(getMessage());
         System.out.println();
     }
