@@ -282,9 +282,13 @@ public class Repository {
      *  TODO: need to check this function after branch/merge command is completed
      */
     public static void global_log() {
-        List<String> files  = plainFilenamesIn(COMMITS_DIR);
-        for(String id : files) {
-            Commit.getCommitFromID(id).printLog(id);
+        File[] dirs = COMMITS_DIR.listFiles(File::isDirectory);
+
+        for(int i=0; i<dirs.length; i++) {
+            List<String> files = plainFilenamesIn(dirs[i]);
+            for (String commitID : files) {
+                Commit.getCommitFromID(commitID).printLog(commitID);
+            }
         }
     }
 
@@ -293,13 +297,16 @@ public class Repository {
      * @param message
      */
     public static void find(String message) {
-        List<String> files = plainFilenamesIn(COMMITS_DIR);
+        File[] dirs = COMMITS_DIR.listFiles(File::isDirectory);
         boolean finded = false;
-        for(String id : files) {
-            var c = Commit.getCommitFromID(id);
-            if(c.getMessage().equals(message)) {
-                finded = true;
-                message(id);
+        for (int i=0; i<dirs.length; i++) {
+            List<String> files = plainFilenamesIn(dirs[i]);
+            for (String commitID : files) {
+                Commit c = Commit.getCommitFromID(commitID);
+                if (c.getMessage().equals(message)) {
+                    finded = true;
+                    message(commitID);
+                }
             }
         }
         if(!finded) {
@@ -399,8 +406,7 @@ public class Repository {
         printStatus("=== Removed Files ===", removeFiles, null);
         message("=== Modifications Not Staged For Commit ===");
         System.out.println();
-        message("=== Untracked Files ===");
-        System.out.println();
+        printStatus("=== Untracked Files ===", untrackedFiles, null);
     }
 
 
