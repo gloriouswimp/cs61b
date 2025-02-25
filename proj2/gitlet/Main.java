@@ -105,6 +105,8 @@ public class Main {
                 Repository.reset(args[1]);
                 break;
             case "merge":
+                argsNumCheck(args, 2);
+                Repository.merge(args[1]);
                 break;
             default:
                 message("No command with that name exists.");

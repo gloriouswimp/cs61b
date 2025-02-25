@@ -1,8 +1,12 @@
 package gitlet;
 
 
+import com.sun.tools.corba.se.idl.StringGen;
+import net.sf.saxon.functions.ConstantFunction;
+
 import java.awt.image.AreaAveragingScaleFilter;
 import java.io.File;
+import java.nio.file.Files;
 import java.sql.Array;
 import java.util.*;
 
@@ -495,4 +499,217 @@ public class Repository {
         setCurrentBranchCommitID(commitID);
     }
 
+    /** Helper method of merge
+     *
+     * @param currentID
+     * @param branchID
+     * @return
+     */
+    private static String getSplitPoint(String currentID, String branchID) {
+        HashMap<String, Integer> mapOfA = Commit.getInheritedMap(currentID);
+        HashMap<String, Integer> mapOfB = Commit.getInheritedMap(branchID);
+        int minVal = -1;
+        String resultID = null;
+
+        for (String id : mapOfA.keySet()) {
+            if (mapOfB.containsKey(id)) {
+                if (minVal == -1) {
+                    minVal = mapOfA.get(id);
+                    resultID = id;
+                    continue;
+                }
+                if (minVal > mapOfA.get(id)) {
+                    minVal = mapOfA.get(id);
+                    resultID = id;
+                }
+            }
+        }
+        return resultID;
+    }
+
+    public static void mergeChecker(String branchName) {
+        if (!Stage.isEmpty()) {
+            message("You have uncommitted changes.");
+            exit(0);
+        }
+        if (!getBranchList().contains(branchName)) {
+            message("A branch with that name does not exist.");
+            exit(0);
+        }
+        if (getCurrentBranchName().equals(branchName)) {
+            message("Cannot merge a branch with itself.");
+            exit(0);
+        }
+        if (!getUntrackedList().isEmpty()) {
+            message("There is an untracked file in the way; delete it, or add and commit it first.");
+            exit(0);
+        }
+
+    }
+    private static Blob writeDiff(String filename, String idInCurrent, String idInBranch) {
+        String curContent = Blob.readContentFromID(idInCurrent);
+        String braContent = Blob.readContentFromID(idInBranch);
+        String resContent = null;
+        if (curContent == null) {
+            resContent = "<<<<<<< HEAD\n"+"=======\n"+braContent+">>>>>>>";
+        }
+        else if (braContent == null) {
+            resContent = "<<<<<<< HEAD\n"+curContent+"=======\n"+">>>>>>>";
+        }
+        else {
+            resContent = "<<<<<<< HEAD\n"+curContent+"=======\n"
+                    +braContent+">>>>>>>";
+        }
+        Blob blob = new Blob(resContent);
+        blob.saveBlob();
+        return blob;
+    }
+
+    public static void merge(String branchName) {
+        mergeChecker(branchName);
+        String currentID = getBranchCommitID(getCurrentBranchName());
+        String branchID = getBranchCommitID(branchName);
+        String splitID = getSplitPoint(currentID, branchID);
+
+        /* Check trivial cases */
+        if (splitID.equals(branchID)) {
+            message("Given branch is an ancestor of the current branch.");
+            exit(0);
+        }
+        if (splitID.equals(currentID)) {
+            checkoutBranch(branchName);
+            message("Current branch fast-forwarded.");
+            exit(0);
+        }
+
+        Commit currentCommit = Commit.getCommitFromID(currentID);
+        Commit branchCommit = Commit.getCommitFromID(branchID);
+        Commit splitCommit = Commit.getCommitFromID(splitID);
+        boolean isConflicted = false;
+
+        Commit mergeCommit = new Commit(currentCommit, new Date(),
+                "Merged " + getCurrentBranchName() + " into " + branchName + ".");
+        TreeMap<String, String> mergeMap = mergeCommit.getBlobMap();
+
+        Set<String> FileSet = new HashSet<String>();
+        TreeMap<String, String> currentMap = currentCommit.getBlobMap();
+        TreeMap<String, String> branchMap = branchCommit.getBlobMap();
+        TreeMap<String, String> splitMap = splitCommit.getBlobMap();
+        for (String filename : currentMap.keySet()) {
+            FileSet.add(filename);
+        }
+        for (String filename : branchMap.keySet()) {
+            FileSet.add(filename);
+        }
+        for (String filename : splitMap.keySet()) {
+            FileSet.add(filename);
+        }
+
+        for (String filename : FileSet) {
+            if (currentMap.containsKey(filename) && branchMap.containsKey(filename) &&
+                    splitMap.containsKey(filename)) {
+                String idInCurrent = currentMap.get(filename);
+                String idInSplit = splitMap.get(filename);
+                String idInBranch = branchMap.get(filename);
+
+                /* case 1 */
+                if (idInCurrent.equals(idInSplit) && !idInCurrent.equals(idInBranch)) {
+                    mergeMap.put(filename, idInBranch);
+                    checkoutDesignatedFile(branchID, filename);
+                    continue;
+                }
+                /* case 2 */
+                if (!idInCurrent.equals(idInSplit) && idInBranch.equals(idInSplit)) {
+                    checkoutDesignatedFile(currentID, filename);
+                    continue;
+                }
+                /* subcase of case 3 */
+                if (idInCurrent.equals(idInBranch)) {
+                    checkoutDesignatedFile(currentID, filename);
+                    continue;
+                }
+                /* subcase of case 8 */
+                /* comment: logic can be simplified */
+                if (!idInCurrent.equals(idInBranch)) {
+                    Blob b = writeDiff(filename, idInCurrent, idInBranch);
+                    isConflicted = true;
+                    mergeMap.put(filename, b.getId());
+                    continue;
+                }
+            }
+            /* subcase of case 3 */
+            if (!currentMap.containsKey(filename) && splitMap.containsKey(filename) &&
+                    !branchMap.containsKey(filename)) {
+                join(CWD, filename).delete();
+            }
+            /* case 4 */
+            if (currentMap.containsKey(filename) && !splitMap.containsKey(filename) &&
+                    !branchMap.containsKey(filename)) {
+                checkoutDesignatedFile(currentID, filename);
+            }
+            /* case 5 */
+            if (!currentMap.containsKey(filename) && !splitMap.containsKey(filename) &&
+                    branchMap.containsKey(filename)) {
+                checkoutDesignatedFile(branchID, filename);
+                mergeMap.put(filename, branchMap.get(filename));
+            }
+            /* case 6 */
+            if (currentMap.containsKey(filename) && splitMap.containsKey(filename) &&
+                    !branchMap.containsKey(filename)) {
+                String idInCurrent = currentMap.get(filename);
+                String idInSplit = splitMap.get(filename);
+                if (idInCurrent.equals(idInSplit)) {
+                    join(CWD, filename).delete();
+                    mergeMap.remove(filename);
+                }
+            }
+            /* case 7 */
+            if (!currentMap.containsKey(filename) && splitMap.containsKey(filename) &&
+                    branchMap.containsKey(filename)) {
+                if (splitMap.get(filename).equals(branchMap.get(filename))) {
+                    join(CWD, filename).delete();
+                }
+            }
+            /* subcase of case 8 */
+            if (!currentMap.containsKey(filename) && splitMap.containsKey(filename) &&
+                    branchMap.containsKey(filename)) {
+                String idInSplit = splitMap.get(filename);
+                String idInBranch = branchMap.get(filename);
+                if (!idInSplit.equals(idInBranch)) {
+                    Blob b = writeDiff(filename, null, idInBranch);
+                    isConflicted = true;
+                    mergeMap.put(filename, b.getId());
+                    continue;
+                }
+            }
+            /* subcase of case 8 */
+            if (currentMap.containsKey(filename) && splitMap.containsKey(filename) &&
+                    !branchMap.containsKey(filename)) {
+                String idInSplit = splitMap.get(filename);
+                String idInCurrent = currentMap.get(filename);
+                if (!idInCurrent.equals(idInSplit)) {
+                    Blob b = writeDiff(filename, idInCurrent, null);
+                    isConflicted = true;
+                    mergeMap.put(filename, b.getId());
+                    continue;
+                }
+            }
+            /* subcase of case 8 */
+            if (currentMap.containsKey(filename) && branchMap.containsKey(filename)) {
+                String idInCurrent = currentMap.get(filename);
+                String idInBranch = branchMap.get(filename);
+                if (!idInCurrent.equals(idInBranch)) {
+                    Blob b = writeDiff(filename, idInCurrent, idInBranch);
+                    isConflicted = true;
+                    mergeMap.put(filename, b.getId());
+                    continue;
+                }
+            }
+        }
+        if (isConflicted) {
+            message("Encountered a merge conflict.");
+        }
+        mergeCommit.setSecondParentID(branchID);
+        mergeCommit.saveCommit(mergeCommit.getCommitID());
+    }
 }

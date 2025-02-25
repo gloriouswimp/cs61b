@@ -109,4 +109,25 @@ public class TestMain {
             files.remove(i);
         }
     }
+
+    @Test
+    public void testString() {
+        String s = "1234567";
+        message(s.substring(0, 5));
+    }
+    @Test
+    public void testLog(){
+        Repository.log();
+    }
+    @Test
+    public void testPrintNull() {
+        System.out.println("add"+""+"2");
+    }
+    @Test
+    public void testAddUp() {
+        int i = 0;
+        while (i < 10) {
+            System.out.println(i++);
+        }
+    }
 }

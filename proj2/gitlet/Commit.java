@@ -2,6 +2,8 @@ package gitlet;
 
 // TODO: any imports you need here
 
+import jh61b.junit.In;
+
 import java.io.File;
 import java.io.Serializable;
 import java.util.*;
@@ -134,6 +136,58 @@ public class Commit implements Serializable {
         System.out.println();
     }
 
+    public static HashMap<String, Integer> getInheritedMap(String commitID) {
+        class CommitNode {
+            public Commit commit;
+            public int height;
+
+            public CommitNode(Commit c, int h) {
+                this.commit = c;
+                this.height = h;
+            }
+        }
+
+        Deque<CommitNode> deque =  new ArrayDeque<>();
+        HashMap<String, Integer> map = new HashMap<>();
+        CommitNode first = new CommitNode(getCommitFromID(commitID), 0);
+        deque.add(first);
+        map.put(commitID, 0);
+
+
+        while (!deque.isEmpty()) {
+            CommitNode n = deque.poll();
+            Commit c = n.commit;
+            int height = n.height;
+            if (c.firstParentID != null) {
+                Commit parent = getCommitFromID(c.firstParentID);
+                CommitNode parentNode = new CommitNode(parent, height + 1);
+                deque.add(parentNode);
+                /* check whether the parent visited before */
+                if (map.containsKey(c.firstParentID) &&
+                        map.get(c.firstParentID) < height + 1) {
+                    // nothing to do
+                }
+                else {
+                    map.put(c.firstParentID, height + 1);
+                }
+            }
+            if (c.secondParentID != null) {
+                Commit parent = getCommitFromID(c.secondParentID);
+                CommitNode parentNode = new CommitNode(parent, height + 1);
+                deque.add(parentNode);
+                /* check whether the parent visited before */
+                if (map.containsKey(c.secondParentID) &&
+                        map.get(c.secondParentID) < height + 1) {
+                    // nothing to do
+                }
+                else {
+                    map.put(c.secondParentID, height + 1);
+                }
+            }
+        }
+        return map;
+    }
+
     /* FILE OPERATIONS */
 
     /** Add a pair of filename and blobID to the blobMap
@@ -177,10 +231,27 @@ public class Commit implements Serializable {
 
     public void setMessage(String message) { this.message = message; }
 
+    public void setSecondParentID(String id) {
+        this.secondParentID = id;
+    }
 
     /** Get content of the given file */
     public String getContentFromName(String filename) {
         String blobID = blobMap.get(filename);
         return Blob.readContentFromID(blobID);
+    }
+
+    public Commit getFirstParentCommit() {
+        if (firstParentID == null) {
+            return null;
+        }
+        return getCommitFromID(firstParentID);
+    }
+
+    public Commit getSecondParentCommit() {
+        if (secondParentID == null) {
+            return null;
+        }
+        return getCommitFromID(secondParentID);
     }
 }

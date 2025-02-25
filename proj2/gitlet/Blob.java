@@ -34,6 +34,9 @@ public class Blob {
      * 2. return the content
      * */
     public static String readContentFromID(String id) {
+        if (id == null) {
+            return null;
+        }
         File path = join(BLOBS_DIR, id);
         String content = null;
         if(path.exists()) {
