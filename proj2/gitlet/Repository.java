@@ -1,9 +1,6 @@
 package gitlet;
 
 
-import com.sun.tools.corba.se.idl.StringGen;
-import net.sf.saxon.functions.ConstantFunction;
-
 import java.awt.image.AreaAveragingScaleFilter;
 import java.io.File;
 import java.nio.file.Files;
@@ -560,6 +557,7 @@ public class Repository {
             resContent = "<<<<<<< HEAD\n"+curContent+"=======\n"
                     +braContent+">>>>>>>";
         }
+        writeContents(join(CWD, filename), resContent);
         Blob blob = new Blob(resContent);
         blob.saveBlob();
         return blob;
@@ -711,5 +709,6 @@ public class Repository {
         }
         mergeCommit.setSecondParentID(branchID);
         mergeCommit.saveCommit(mergeCommit.getCommitID());
+        setCurrentBranchCommitID(mergeCommit.getCommitID());
     }
 }
